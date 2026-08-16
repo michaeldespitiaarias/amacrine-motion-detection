@@ -1,5 +1,7 @@
 # Dopaminergic amacrine cells modulate retinal movement detection — analysis code
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21969128.svg)](https://doi.org/10.5281/zenodo.21969128)
+
 Analysis code accompanying this paper. It cleans and screens a dataset,
 reports the assumptions behind the tests that follow, and runs two-group
 contrasts with effect sizes, confidence intervals, and Benjamini-Hochberg

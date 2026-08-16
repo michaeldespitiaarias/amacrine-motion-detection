@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: >-
   If you use this software, please cite the Zenodo DOI of the specific
   release used, not this repository generically — see the "version" and
-  "doi" fields below, filled in at release time.
+  "identifiers" fields below.
 title: "Analysis code for: Dopaminergic amacrine cells modulate retinal movement detection"
 type: software
 authors:
@@ -10,9 +10,13 @@ authors:
     given-names: "Michael D."
     email: esspitia@gmail.com
 repository-code: "https://github.com/michaeldespitiaarias/amacrine-motion-detection"
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21969128
+    description: "Zenodo archive of release v1.0.0, the version cited by the paper"
 license: PolyForm-Noncommercial-1.0.0
-version: "0.0.0"  # TODO: set to the tagged release version (e.g. v1.0.0) at Zenodo archival time
-date-released: "TODO"  # TODO: set at release time, ISO 8601 (YYYY-MM-DD)
+version: "v1.0.0"
+date-released: "2026-08-16"
 preferred-citation:
   type: article
   title: "Dopaminergic amacrine cells modulate retinal movement detection"
