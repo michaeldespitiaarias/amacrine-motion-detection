@@ -1,0 +1,11 @@
+# Test selection depends on library behaviour - SciPy switches between exact and
+# asymptotic p-values by sample size - so these floors are load-bearing.
+#
+# All output is plain CSV (see expda/reporting.py) — no plotting or HTML
+# libraries are needed.
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+statsmodels>=0.14
+pingouin>=0.5.5
+scikit-learn>=1.3

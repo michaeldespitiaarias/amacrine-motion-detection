@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Data / results (never committed — path comes from EXPDA_DATA)
+data/
+*.csv
+!registry.example.json
+
+# Exception: samples/ holds committed SYNTHETIC demo data + its real,
+# pre-baked pipeline output, proof the code runs end-to-end without
+# needing the actual (unpublished) experimental dataset.
+!samples/**
+
+# Real experimental data / manuscript material dropped into the working
+# tree for local analysis — never part of this repo's history, public or
+# not. Ignored by exact name (not a generic pattern) so a future, similarly
+# named folder doesn't silently start being tracked instead of ignored.
+/RE_ Manuscrito para ajustes finales/
+*.docx
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/

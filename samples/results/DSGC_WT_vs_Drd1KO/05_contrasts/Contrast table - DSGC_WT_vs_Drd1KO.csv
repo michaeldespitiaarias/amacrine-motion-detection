@@ -1,0 +1,3 @@
+Variable,group 1,group 2,n (group 1),n (group 2),mean (group 1),SD (group 1),mean (group 2),SD (group 2),direction,test,p_value,significance,effect size metric,effect size value,normality p (group 1),normality p (group 2),variance test,variance p,Hedges g,rank-biserial (signed),effect 95% CI,p_value_fdr_bh,significant_fdr
+DSI,WT,Drd1-KO,14,14,0.622,0.057,0.44,0.069,WT > Drd1-KO,Student's t-test,0.0,***,Cohen's d,2.893,0.2188,0.6752,Bartlett,0.5068,2.809,0.99,"[2.25, 4.13]",0.0,True
+Firing_rate_Hz,WT,Drd1-KO,14,14,24.116,3.652,23.848,2.836,WT > Drd1-KO,Student's t-test,0.830072,ns,Cohen's d,0.082,0.9975,0.2116,Bartlett,0.3734,0.08,0.031,"[-0.68, 0.88]",0.830072,False

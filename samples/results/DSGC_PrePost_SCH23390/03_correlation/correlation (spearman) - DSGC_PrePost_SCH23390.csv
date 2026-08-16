@@ -1,0 +1,4 @@
+,DSI,Firing_rate_Hz,Response_latency_ms
+DSI,1.0,0.0473,-0.1998
+Firing_rate_Hz,0.0473,1.0,-0.1432
+Response_latency_ms,-0.1998,-0.1432,1.0

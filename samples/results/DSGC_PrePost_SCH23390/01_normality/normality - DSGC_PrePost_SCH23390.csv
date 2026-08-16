@@ -1,0 +1,7 @@
+Group,Variable,N total,N used,Statistic,p-value,Significance
+"('SCH23390',)",DSI,16,16,0.9316,0.2581,ns
+"('SCH23390',)",Firing_rate_Hz,16,16,0.9172,0.1518,ns
+"('SCH23390',)",Response_latency_ms,16,16,0.9321,0.2632,ns
+"('Vehicle',)",DSI,16,16,0.9522,0.526,ns
+"('Vehicle',)",Firing_rate_Hz,16,16,0.9178,0.1554,ns
+"('Vehicle',)",Response_latency_ms,16,16,0.9325,0.2671,ns
