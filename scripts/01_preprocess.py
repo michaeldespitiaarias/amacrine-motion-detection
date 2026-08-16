@@ -3,7 +3,7 @@
 
 Runs the pipeline in order:
 
-    load -> handle missing values -> average trials -> transform
+    load -> handle missing values -> average trials
          -> detect and replace outliers
 
 Normality and homoscedasticity are no longer computed here as standalone
@@ -70,16 +70,7 @@ def preprocess_dataset(name: str, cfg: dict, registry: dict,
     df, numeric_cols, categorical_cols = preprocessing.average_trials(
         df, trial_col, group_column, numeric_cols, subject_column)
 
-    # 4a. Shape-stabilizing transform — BEFORE outliers, so the outlier
-    # detector sees the transformed scale rather than confusing a skewed
-    # raw tail for genuine contamination. See preprocessing.py's
-    # PRE_OUTLIER_TRANSFORMS / POST_OUTLIER_TRANSFORMS split.
-    transform_method = cfg.get("transform", "none")
-    if transform_method in preprocessing.PRE_OUTLIER_TRANSFORMS:
-        df = preprocessing.transform_variables(
-            df, columns=numeric_cols, method=transform_method)
-
-    # 4b. Outliers: flagged by the IQR rule, replaced by the group median,
+    # 4. Outliers: flagged by the IQR rule, replaced by the group median,
     # subject to the replacement-skip gate (outlier_pct_skip /
     # outlier_replace_max_n). Identifier columns are excluded, so that
     # subject ids pass through the pipeline unchanged.
@@ -95,17 +86,7 @@ def preprocess_dataset(name: str, cfg: dict, registry: dict,
         verbose=verbose)
     df_no_outliers = modified[name]
 
-    # 4c. Scale-standardizing transform — AFTER outliers: zscore/minmax are
-    # computed from the column's own mean/std or min/max, and a genuine
-    # outlier would otherwise distort those for every other value before
-    # it gets a chance to be replaced.
-    if transform_method in preprocessing.POST_OUTLIER_TRANSFORMS:
-        df_no_outliers = preprocessing.transform_variables(
-            df_no_outliers, columns=numeric_cols, method=transform_method)
-
-    # Stage 1's output and stage 2's input in one place — see
-    # config.preprocessed_csv_path's docstring for why this used to be two
-    # separate copies and isn't anymore.
+    # Stage 1's output and stage 2's input, in one place.
     out_csv = config.preprocessed_csv_path(name, layout)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     df_no_outliers.to_csv(out_csv, index=False)

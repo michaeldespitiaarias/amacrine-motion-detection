@@ -498,7 +498,8 @@ def run_repeated_families(
         The dataset's preprocessed (working) DataFrame.
     cfg : dict
         The dataset's registry entry. Reads ``repeated_families``,
-        ``comparison_by`` and ``subject_column``.
+        ``group_column`` (whose first entry is the Condition factor) and
+        ``subject_column``.
     folder : str
         The dataset's ``(2) Statistical inference`` output folder.
     verbose : bool
@@ -514,7 +515,7 @@ def run_repeated_families(
     if not families:
         return {}
 
-    cond_col = cfg["comparison_by"]
+    cond_col = cfg["group_column"][0]
     id_col = cfg["subject_column"]
     results = {}
 

@@ -16,9 +16,27 @@ date-released: "TODO"  # TODO: set at release time, ISO 8601 (YYYY-MM-DD)
 preferred-citation:
   type: article
   title: "Dopaminergic amacrine cells modulate retinal movement detection"
+  # Author order matches the manuscript byline. Paleo and Espitia Arias
+  # (positions 1-2) are co-first authors -- the CFF 1.2.0 schema has no
+  # field for equal contribution, so it's recorded here as a comment;
+  # carry the same note into any venue-specific citation export that does
+  # support it (e.g. a footnote/equal-contribution flag in the journal's
+  # own submission system).
   authors:
+    - family-names: "Paleo"
+      given-names: "Víctor"
     - family-names: "Espitia Arias"
       given-names: "Michael D."
+    - family-names: "Vaquero"
+      given-names: "Cecilia F."
+    - family-names: "Dumitru"
+      given-names: "Adina"
+    - family-names: "Alcacer"
+      given-names: "Cristina"
+    - family-names: "Germain"
+      given-names: "Francisco"
+    - family-names: "de la Villa"
+      given-names: "Pedro"
   year: 2026
   journal: "TODO: journal name"
   # doi: "TODO: paper DOI, once assigned"

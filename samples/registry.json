@@ -11,9 +11,7 @@
       ],
       "trial_column": "",
       "subject_column": "Subject",
-      "comparison_by": "Condition",
-      "paired": true,
-      "transform": "none"
+      "paired": true
     },
     "DSGC_WT_vs_Drd1KO": {
       "group_column": [
@@ -21,9 +19,7 @@
       ],
       "trial_column": "",
       "subject_column": "Animal_ID",
-      "comparison_by": "Genotype",
-      "paired": false,
-      "transform": "none"
+      "paired": false
     }
   }
 }

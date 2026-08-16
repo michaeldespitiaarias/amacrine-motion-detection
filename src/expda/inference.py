@@ -507,7 +507,9 @@ def run_two_group_pipeline(datasets: dict, folder: str,
     Parameters
     ----------
     datasets : dict
-        ``{name: {location, comparison_by, paired, subject_column, ...}}``.
+        ``{name: {location, group_column, paired, subject_column, ...}}``.
+        The comparison factor is ``group_column[0]`` -- the same column
+        used to stratify imputation and outlier screening.
     folder : str
         Directory receiving one CSV table per dataset.
     table_prefix : str
@@ -534,7 +536,12 @@ def run_two_group_pipeline(datasets: dict, folder: str,
 
     for name, cfg in datasets.items():
         df, numeric_cols, _ = load_dataset(name, cfg)
-        comparison_col = cfg["comparison_by"]
+        # group_column also names the comparison factor -- there is no
+        # dataset in this project's registries where the imputation/
+        # outlier-screening stratum and the tested factor ever differed,
+        # so the first (and typically only) entry in group_column doubles
+        # as the two-group comparison column.
+        comparison_col = cfg["group_column"][0]
 
         # `levels`, where declared, selects the two conditions to contrast and
         # the order in which they are taken, so that a design measured at more

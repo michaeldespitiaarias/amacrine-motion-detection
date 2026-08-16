@@ -1,10 +1,9 @@
-# Paper 1 — analysis code
+# Dopaminergic amacrine cells modulate retinal movement detection — analysis code
 
-Analysis code accompanying **"Dopaminergic amacrine cells modulate retinal
-movement detection."** It cleans and screens a dataset, reports the
-assumptions behind the tests that follow, and runs two-group contrasts with
-effect sizes, confidence intervals, and Benjamini-Hochberg FDR correction
-across the variables tested. Variables that are levels of one within-subject
+Analysis code accompanying this paper. It cleans and screens a dataset,
+reports the assumptions behind the tests that follow, and runs two-group
+contrasts with effect sizes, confidence intervals, and Benjamini-Hochberg
+FDR correction across the variables tested. Variables that are levels of one within-subject
 factor (e.g. contrast sensitivity at six spatial frequencies) are instead
 routed to a 2-way repeated-measures ANOVA, so the correlation between
 adjacent levels is used rather than discarded, and per-level comparisons only
@@ -14,12 +13,6 @@ Repeated-measures level families below.
 Every output is a plain CSV — raw numbers, no styling, no narrative
 document, no figures. This is a statistical-analysis repository, not a
 reporting tool.
-
-This repository exists to reproduce the exact analysis behind that specific
-paper — it is not a general-purpose statistics tool. When the manuscript is
-final, this code is frozen at a tagged release (`v1.0.0`) and archived on
-Zenodo, so the DOI cited in the paper always resolves to the exact code that
-produced its results, independent of any later work.
 
 ## Layout
 
@@ -71,7 +64,6 @@ export EXPDA_REGISTRY=/path/to/registry.json   # optional
       "group_column": ["Condition"],
       "trial_column": "Trial",
       "subject_column": "Subject",
-      "comparison_by": "Condition",
       "paired": true,
       "repeated_families": {
         "Contrast sensitivity": {
@@ -86,13 +78,11 @@ export EXPDA_REGISTRY=/path/to/registry.json   # optional
 
 | Key | Meaning |
 |---|---|
-| `group_column` | strata for imputation and outlier screening |
+| `group_column` | strata for imputation and outlier screening; its first entry also names the factor whose two levels are contrasted |
 | `trial_column` | column collapsed so that the subject is the unit of analysis |
 | `subject_column` | subject identifier, used to align paired samples |
-| `comparison_by` | the factor whose two levels are contrasted |
 | `paired` | whether the contrast uses a paired test |
 | `levels` | optional pair selecting which two levels to contrast and their order |
-| `transform` | optional variable transformation, default `none` |
 | `mv_drop_pct` | missing-value skip gate, default `30` (%) — see Pipeline below |
 | `outlier_pct_skip` | outlier replacement-skip gate, default `15` (%) |
 | `outlier_replace_max_n` | absolute cap on points replaced per (group, column), default `2` |
@@ -110,10 +100,8 @@ Expected tree under the data root:
 ```
 
 The dataset name is the join key across every stage: the same string names the
-input CSV, the results folder and the table inside it. There is no separate
-top-level "working" mirror of the preprocessed CSV — stage 2 reads it
-straight from `(1) Preprocessed/`, so there is only one copy to ever go
-stale.
+input CSV, the results folder and the table inside it. Stage 2 reads the
+preprocessed CSV straight from `(1) Preprocessed/`.
 
 ## Usage
 
@@ -134,41 +122,19 @@ python scripts/02_two_group_contrasts.py --output /tmp/tables --no-intervals
     ↓  handle_nulls                 missing values → group median or mode,
     │                                skipped above mv_drop_pct % missing
     ↓  average_trials               collapse trials → one row per subject
-    ↓  transform_variables          shape-stabilizing methods only
-    │                                (log/sqrt/boxcox/yeojohnson)
     ↓  detect_and_replace_outliers  1.5 × IQR within group → group median,
     │                                skipped above outlier_pct_skip % or
     │                                outlier_replace_max_n flagged (small
     │                                groups only) — see Safety gates below
-    ↓  transform_variables          scale-standardizing methods only
-                                     (zscore/minmax)
 <results_dir>/<Dataset>/(1) Preprocessed/<Dataset>_no_outliers.csv
     ↓  compare_two_groups         variables outside any repeated_families group
     ↓  rm_anova.run_repeated_families   one 2-way RM-ANOVA per declared family
 <results_dir>/<Dataset>/(2) Statistical inference/…csv
 ```
 
-Normality and homoscedasticity are not written as separate reports —
-`compare_two_groups` and `rm_anova.py` each recompute the assumption checks
-that gate their own test/engine choice and write them as columns in the
-same table, right before the test they gated (see Test selection below).
-There is nothing to cross-reference against a separate file: a starred
-assumption column means that assumption was rejected, not that a real
-effect was found.
-
 `average_trials` makes the subject, rather than the trial, the unit of analysis.
 Designs measured at more than two levels declare a `levels` pair in the registry
 to select which two conditions are contrasted.
-
-The two `transform_variables` passes are not the same call twice: which one
-runs (if either) depends on which family the configured `transform` method
-falls into. Shape-stabilizing transforms (log, sqrt, Box-Cox, Yeo-Johnson)
-run *before* outlier detection, so the detector sees the transformed scale
-rather than mistaking a skewed raw tail for contamination. Scale-
-standardizing transforms (z-score, min-max) run *after* outlier replacement,
-since they are computed from the column's own mean/std or min/max and a
-genuine outlier would otherwise distort those statistics for every other
-value in the column before it gets replaced.
 
 ### Safety gates
 
