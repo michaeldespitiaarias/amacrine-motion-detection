@@ -1,10 +1,14 @@
 """Multiple-comparison corrections shared across the inference modules.
 
-Kept in its own module (rather than inline in ``inference.py``) so a
-second correction can be added alongside this one without touching the
-inference logic. This repository only needs BH-FDR: with exactly one
-test per variable (a single two-group contrast), there is no
-within-variable family of pairwise comparisons to additionally correct.
+Two corrections live here:
+
+- ``bh_fdr`` — Benjamini-Hochberg FDR across every variable tested in one
+  dataset's table.
+- ``holm_adjust`` — Holm-Bonferroni step-down across the pairwise
+  post-hoc comparisons of one repeated-measures family (see
+  ``rm_anova.py``), used only when that family's Condition x Level
+  interaction (or main effect) clears its own omnibus gate first —
+  simple effects are never tested unguarded across every level.
 """
 
 from __future__ import annotations
@@ -56,3 +60,32 @@ def bh_fdr(p_values) -> list[float]:
     q_full = np.full_like(p_arr, np.nan)
     q_full[valid_mask] = q_valid
     return list(q_full)
+
+
+def holm_adjust(p_values) -> list[float]:
+    """Holm-Bonferroni step-down correction.
+
+    Less conservative than plain Bonferroni while still controlling the
+    family-wise error rate exactly, no independence assumption needed.
+
+    Parameters
+    ----------
+    p_values : array-like
+        Raw p-values from one family of pairwise comparisons.
+
+    Returns
+    -------
+    list[float]
+        Adjusted p-values, same order and length as *p_values*, each
+        capped at 1.0 and monotonically non-decreasing in rank order.
+    """
+    p_values = list(p_values)
+    n = len(p_values)
+    order = np.argsort(p_values)
+    adj = [0.0] * n
+    running_max = 0.0
+    for rank, idx in enumerate(order):
+        p_adj = (n - rank) * p_values[idx]
+        running_max = max(running_max, p_adj)
+        adj[idx] = min(running_max, 1.0)
+    return adj

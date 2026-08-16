@@ -6,6 +6,5 @@
 numpy>=1.26
 pandas>=2.0
 scipy>=1.11
-statsmodels>=0.14
 pingouin>=0.5.5
 scikit-learn>=1.3

@@ -1,13 +1,14 @@
 {
   "layout": {
     "input_dir": "input",
-    "working_dir": "working",
     "results_dir": "results",
-    "table_prefix": "Contrast table"
+    "table_prefix": "Two-group comparisons"
   },
   "datasets": {
     "DSGC_PrePost_SCH23390": {
-      "group_column": ["Condition"],
+      "group_column": [
+        "Condition"
+      ],
       "trial_column": "",
       "subject_column": "Subject",
       "comparison_by": "Condition",
@@ -15,7 +16,9 @@
       "transform": "none"
     },
     "DSGC_WT_vs_Drd1KO": {
-      "group_column": ["Genotype"],
+      "group_column": [
+        "Genotype"
+      ],
       "trial_column": "",
       "subject_column": "Animal_ID",
       "comparison_by": "Genotype",

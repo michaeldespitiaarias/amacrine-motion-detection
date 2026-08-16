@@ -54,7 +54,7 @@ def main() -> int:
     results: dict = {}
 
     for name, cfg in datasets.items():
-        cfg = {**cfg, "location": str(config.working_path(name, layout))}
+        cfg = {**cfg, "location": str(config.preprocessed_csv_path(name, layout))}
         folder = args.output or config.results_path(name, "hypothesis_contrast", layout)
         Path(folder).mkdir(parents=True, exist_ok=True)
         results.update(inference.run_two_group_pipeline(

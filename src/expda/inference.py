@@ -23,13 +23,22 @@ reported alongside the raw, uncorrected p-value rather than replacing it.
 Designs measured at more than two levels declare a ``levels`` pair in the
 registry, which selects the two conditions to contrast and their order.
 
+Variables named in the dataset's ``repeated_families`` config are levels of
+one within-subject factor rather than independent variables, and are routed
+to ``rm_anova.py``'s 2-way repeated-measures ANOVA instead (excluded here so
+a level is never tested by both engines) — see that module's docstring.
+
 Output
 ------
-One CSV table per dataset. Alongside the test, its p-value, significance class
-and effect size, each row carries n, mean, SD and median per group, the
-direction of the effect, the pretest p-values, Hedges' g, a bootstrap
-confidence interval, a signed rank-biserial, and the BH-FDR-adjusted q-value
-with its own significance flag.
+One CSV table per dataset. Each row carries n, mean, SD per group and the
+direction of the effect, then the assumption checks that gated the test
+choice (normality test name + p-value + significance per group,
+homoscedasticity test name + p-value + significance — a starred assumption
+p-value means the assumption was rejected, not that a real effect was
+found), then the test itself: its name, p-value, significance class and
+effect size, Hedges' g, a bootstrap confidence interval, a signed
+rank-biserial, and the BH-FDR-adjusted q-value with its own significance
+stars.
 """
 
 from __future__ import annotations
@@ -185,19 +194,21 @@ def _extract_samples(
 # ============================================================================= #
 
 
-def _normality(data1, data2, max_n_shapiro: int) -> tuple[float, float]:
-    """Per-group normality p-values, Shapiro-Wilk or D'Agostino K^2 by size.
+def _normality(data1, data2, max_n_shapiro: int) -> tuple[str, float, float]:
+    """Per-group normality test name and p-values, by size.
 
-    On failure both p-values are set to 0, routing the contrast to the
+    Shapiro-Wilk up to ``max_n_shapiro`` combined n, D'Agostino K^2 above
+    it. On failure both p-values are set to 0, routing the contrast to the
     non-parametric branch.
     """
     n_total = len(data1) + len(data2)
+    name = "Shapiro-Wilk" if n_total <= max_n_shapiro else "D'Agostino K^2"
     try:
         if n_total <= max_n_shapiro:
-            return stats.shapiro(data1)[1], stats.shapiro(data2)[1]
-        return stats.normaltest(data1)[1], stats.normaltest(data2)[1]
+            return name, stats.shapiro(data1)[1], stats.shapiro(data2)[1]
+        return name, stats.normaltest(data1)[1], stats.normaltest(data2)[1]
     except Exception:
-        return 0.0, 0.0
+        return name, 0.0, 0.0
 
 
 def _equal_variance(data1, data2, both_normal: bool) -> tuple[str, float]:
@@ -268,7 +279,7 @@ def compare_two_groups(
     folder: str,
     paired: dict,
     subject: dict | None = None,
-    table_prefix: str = "Contrast table",
+    table_prefix: str = "Two-group comparisons",
     min_n: int = 3,
     max_n_shapiro: int = 5000,
     with_intervals: bool = True,
@@ -355,7 +366,7 @@ def compare_two_groups(
                 res_dict[var] = _blank_row(group1, group2, problem, data1, data2)
                 continue
 
-            p_norm1, p_norm2 = _normality(data1, data2, max_n_shapiro)
+            normality_test, p_norm1, p_norm2 = _normality(data1, data2, max_n_shapiro)
             both_normal = p_norm1 > ALPHA and p_norm2 > ALPHA
 
             variance_test, p_variance = _equal_variance(data1, data2, both_normal)
@@ -364,7 +375,9 @@ def compare_two_groups(
             test_name, _stat, p_value, effect_value, effect_metric = _run_test(
                 data1, data2, is_paired, both_normal, equal_var)
 
-            row = _blank_row(group1, group2, test_name, data1, data2)
+            row = _blank_row(group1, group2, test_name, data1, data2,
+                              normality_test=normality_test, p_norm1=p_norm1, p_norm2=p_norm2,
+                              variance_test=variance_test, p_variance=p_variance)
             row.update({
                 "p_value": round(float(p_value), 6),
                 "significance": _stars(p_value if p_value is not None else 1),
@@ -374,11 +387,6 @@ def compare_two_groups(
                     if effect_value is not None and not np.isnan(effect_value)
                     else np.nan
                 ),
-                "normality p (group 1)": round(float(p_norm1), 4),
-                "normality p (group 2)": round(float(p_norm2), 4),
-                "variance test": variance_test,
-                "variance p": (round(float(p_variance), 4)
-                               if np.isfinite(p_variance) else np.nan),
                 "Hedges g": round(hedges_g(data1.values, data2.values, is_paired), 3),
                 "rank-biserial (signed)": round(
                     rank_biserial(data1.values, data2.values, is_paired), 3),
@@ -402,13 +410,15 @@ def compare_two_groups(
         # effect size — a reader who wants the uncorrected result still
         # has it. Variables skipped above (blank rows, p_value = NaN)
         # pass through untouched, per bh_fdr's NaN handling.
+        # significance_fdr mirrors p_value/significance's own stars-not-
+        # boolean convention (there is no "significant" column anywhere
+        # else in this table) rather than a one-off True/False.
         variables_in_table = list(res_dict.keys())
         q_values = bh_fdr([res_dict[v]["p_value"] for v in variables_in_table])
         for var, q in zip(variables_in_table, q_values):
             res_dict[var]["p_value_fdr_bh"] = (
                 round(float(q), 6) if np.isfinite(q) else np.nan)
-            res_dict[var]["significant_fdr"] = bool(
-                np.isfinite(q) and q < ALPHA)
+            res_dict[var]["significance_fdr"] = _stars(q) if np.isfinite(q) else "n/a"
 
         results_all[name] = res_dict
 
@@ -423,12 +433,23 @@ def compare_two_groups(
     return results_all
 
 
-def _blank_row(group1, group2, test_label: str, data1=None, data2=None) -> dict:
+def _blank_row(group1, group2, test_label: str, data1=None, data2=None,
+                normality_test=None, p_norm1=np.nan, p_norm2=np.nan,
+                variance_test=None, p_variance=np.nan) -> dict:
     """Build a result row carrying the descriptives, with no test outcome yet.
 
     Descriptives are attached even when the contrast is skipped, so that the
     table still shows how much data each variable had. ``direction`` states in
-    words which group scores higher.
+    words which group scores higher. The assumption-check columns (normality
+    per group, homoscedasticity) sit immediately before ``test``/``p_value``
+    — the assumptions that gated which test was chosen are read first, the
+    outcome they gated second — rather than being appended after the fact as
+    the caller's own ``compare_two_groups`` loop used to do. Their
+    significance columns read the opposite way from every other
+    significance column in this table: a starred normality or
+    homoscedasticity p-value means the assumption was *rejected* (routing
+    the contrast to the non-parametric / unequal-variance branch), not that
+    a real effect was found — ``ns`` here is the reassuring result.
     """
     d1 = describe_group(data1 if data1 is not None else [])
     d2 = describe_group(data2 if data2 is not None else [])
@@ -453,6 +474,14 @@ def _blank_row(group1, group2, test_label: str, data1=None, data2=None) -> dict:
         "mean (group 2)": round(d2["mean"], 3) if np.isfinite(d2["mean"]) else np.nan,
         "SD (group 2)": round(d2["sd"], 3) if np.isfinite(d2["sd"]) else np.nan,
         "direction": direction,
+        "normality test": normality_test or "n/a",
+        "normality p (group 1)": round(float(p_norm1), 4) if np.isfinite(p_norm1) else np.nan,
+        "normality significance (group 1)": _stars(p_norm1) if np.isfinite(p_norm1) else "n/a",
+        "normality p (group 2)": round(float(p_norm2), 4) if np.isfinite(p_norm2) else np.nan,
+        "normality significance (group 2)": _stars(p_norm2) if np.isfinite(p_norm2) else "n/a",
+        "homoscedasticity test": variance_test or "n/a",
+        "homoscedasticity p": round(float(p_variance), 4) if np.isfinite(p_variance) else np.nan,
+        "homoscedasticity significance": _stars(p_variance) if np.isfinite(p_variance) else "n/a",
         "test": test_label,
         "p_value": np.nan,
         "significance": "ns",
@@ -467,7 +496,7 @@ def _blank_row(group1, group2, test_label: str, data1=None, data2=None) -> dict:
 
 
 def run_two_group_pipeline(datasets: dict, folder: str,
-                           table_prefix: str = "Contrast table",
+                           table_prefix: str = "Two-group comparisons",
                            with_intervals: bool = True,
                            verbose: bool = True) -> dict:
     """Run the two-group contrast for every configured dataset.
@@ -495,6 +524,13 @@ def run_two_group_pipeline(datasets: dict, folder: str,
     """
     os.makedirs(folder, exist_ok=True)
     all_results: dict[str, dict] = {}
+    # Tracks every dataset actually processed, including ones made entirely
+    # of repeated_families columns (which never touch compare_two_groups
+    # and so never gain an all_results entry) -- an earlier version of this
+    # loop counted only len(all_results) here, silently under-reporting any
+    # such dataset as "0 dataset(s) analysed" even though its RM-ANOVA
+    # tables were written correctly.
+    processed = set()
 
     for name, cfg in datasets.items():
         df, numeric_cols, _ = load_dataset(name, cfg)
@@ -529,20 +565,42 @@ def run_two_group_pipeline(datasets: dict, folder: str,
         # selected at once). Excluded explicitly here by the configured
         # `subject_column`, on top of the existing "id" substring filter.
         subject_col = cfg.get("subject_column")
-        test_vars = [v for v in numeric_cols if v != subject_col]
 
-        all_results.update(compare_two_groups(
-            dataframes={name: df},
-            comparison_by={name: comparison_col},
-            variables=test_vars,
-            folder=folder,
-            paired={name: cfg.get("paired", False)},
-            subject={name: cfg.get("subject_column")},
-            table_prefix=table_prefix,
-            with_intervals=with_intervals,
-            verbose=verbose,
-        ))
+        # Columns claimed by a `repeated_families` entry (see rm_anova.py)
+        # are levels of one within-subject factor, not independent
+        # variables — they go through the 2-way RM-ANOVA dispatch below
+        # instead of the plain per-variable path, so they're excluded here
+        # to avoid testing the same level twice under two different
+        # engines. Deferred import: rm_anova imports the private test
+        # dispatch from this module, so importing it at module level here
+        # would be circular.
+        from .rm_anova import repeated_family_columns, run_repeated_families
+        claimed = repeated_family_columns(cfg, df.columns)
+        test_vars = [v for v in numeric_cols if v != subject_col and v not in claimed]
+
+        if test_vars:
+            all_results.update(compare_two_groups(
+                dataframes={name: df},
+                comparison_by={name: comparison_col},
+                variables=test_vars,
+                folder=folder,
+                paired={name: cfg.get("paired", False)},
+                subject={name: cfg.get("subject_column")},
+                table_prefix=table_prefix,
+                with_intervals=with_intervals,
+                verbose=verbose,
+            ))
+            processed.add(name)
+
+        if run_repeated_families(df, cfg, folder=folder, verbose=verbose):
+            processed.add(name)
+            # Ensures the dataset is visible in the returned dict too (not
+            # just this function's own print) even when it had no plain
+            # variables at all -- 02_two_group_contrasts.py's own final
+            # tally reads off this return value, and would otherwise
+            # silently drop a repeated-families-only dataset the same way.
+            all_results.setdefault(name, {})
 
     if verbose:
-        print(f"\nFinished. {len(all_results)} dataset(s) analysed.")
+        print(f"\nFinished. {len(processed)} dataset(s) analysed.")
     return all_results

@@ -1,5 +1,0 @@
-Group,Variable,N total,N used,Statistic,p-value,Significance
-"('Drd1-KO',)",DSI,14,14,0.9571,0.6752,ns
-"('Drd1-KO',)",Firing_rate_Hz,14,14,0.9188,0.2116,ns
-"('WT',)",DSI,14,14,0.9198,0.2188,ns
-"('WT',)",Firing_rate_Hz,14,14,0.987,0.9975,ns

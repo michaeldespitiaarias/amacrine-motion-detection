@@ -5,7 +5,10 @@ Runs the pipeline in order:
 
     load -> handle missing values -> average trials -> transform
          -> detect and replace outliers
-         -> normality -> homoscedasticity -> correlation -> multicollinearity
+
+Normality and homoscedasticity are no longer computed here as standalone
+reports: stage 2 (``inference.py`` / ``rm_anova.py``) recomputes them per
+test and writes them as columns in the results table itself.
 
 Every diagnostic report is a plain CSV (no plots, no HTML — see
 ``expda.preprocessing``'s module docstring).
@@ -28,8 +31,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import numpy as np  # noqa: E402
-
 from expda import config, preprocessing  # noqa: E402
 
 
@@ -39,7 +40,6 @@ def preprocess_dataset(name: str, cfg: dict, registry: dict,
     print(f"\n{'=' * 70}\nProcessing dataset: {name}\n{'=' * 70}")
 
     layout = registry["layout"]
-    datasets_config = registry["datasets"]
 
     dataset_root = config.DATA_ROOT / layout["results_dir"] / name
     if clean and dataset_root.exists():
@@ -103,65 +103,13 @@ def preprocess_dataset(name: str, cfg: dict, registry: dict,
         df_no_outliers = preprocessing.transform_variables(
             df_no_outliers, columns=numeric_cols, method=transform_method)
 
-    # Written to two places: the per-dataset report folder (alongside this
-    # dataset's other diagnostic CSV output, for a human browsing
-    # results/<Dataset>/), and config.working_path() — the canonical
-    # stage-1 -> stage-2 handoff location that 02_two_group_contrasts.py
-    # actually reads from by default. These used to diverge (results-
-    # folder copy only), which silently broke the two-stage pipeline
-    # end-to-end unless --output was passed explicitly to stage 2.
-    out_csv = (config.results_path(name, "intermediate", layout)
-               / f"{name}_no_outliers.csv")
+    # Stage 1's output and stage 2's input in one place — see
+    # config.preprocessed_csv_path's docstring for why this used to be two
+    # separate copies and isn't anymore.
+    out_csv = config.preprocessed_csv_path(name, layout)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
     df_no_outliers.to_csv(out_csv, index=False)
     print(f"Preprocessed data -> {out_csv}")
-
-    working_csv = config.working_path(name, layout)
-    working_csv.parent.mkdir(parents=True, exist_ok=True)
-    df_no_outliers.to_csv(working_csv, index=False)
-    print(f"Preprocessed data -> {working_csv} (stage-2 input)")
-
-    # 6-7. Assumption reports ----------------------------------------------- #
-    normality_results = preprocessing.normality_test(
-        {name: df_no_outliers}, numeric_cols,
-        group_column={name: group_column},
-        folder=str(config.results_path(name, "normality", layout)), verbose=verbose)
-
-    preprocessing.homoscedasticity_test(
-        {name: df_no_outliers}, numeric_cols,
-        folder=str(config.results_path(name, "homoscedasticity", layout)),
-        normality_results=normality_results,
-        group_column={name: group_column}, verbose=verbose)
-
-    # 8. Correlation and label encoding -------------------------------------- #
-    mappings = cfg.get("categorical_mappings", {})
-    _label_mappings, encoded = preprocessing.correlation_and_encoding_auto(
-        dataframes={name: df_no_outliers},
-        variables=numeric_cols + list(mappings.keys()),
-        folder=str(config.results_path(name, "correlation", layout)),
-        datasets_config=datasets_config,
-        normality_results=normality_results, verbose=verbose)
-
-    # 9. Multicollinearity ---------------------------------------------------- #
-    # `correlation_and_encoding_auto` skips (and omits from `encoded`) any
-    # dataset left with fewer than 2 non-constant numeric variables after
-    # its own identifier/constant-column filtering — VIF needs at least 2
-    # variables to say anything. Common now that the subject identifier is
-    # correctly excluded from numeric_cols (a dataset whose only measured
-    # variable is, say, a single Activity_au column has nothing left to
-    # test collinearity against).
-    if name not in encoded:
-        if verbose:
-            print(f"⚠️ Skipped multicollinearity for '{name}': "
-                  f"not enough non-constant numeric variables.")
-    else:
-        numeric_vars = encoded[name].select_dtypes(include=[np.number]).columns.tolist()
-        _multicol, transformed = preprocessing.multicollinearity_analysis_auto(
-            dataframes=encoded, variables=numeric_vars,
-            folder=str(config.results_path(name, "multicollinearity", layout)),
-            verbose=verbose)
-        transformed[name].to_csv(
-            config.results_path(name, "intermediate", layout)
-            / f"{name}_multicollinearity.csv", index=False)
 
 
 def main() -> int:

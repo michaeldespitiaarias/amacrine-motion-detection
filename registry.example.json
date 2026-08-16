@@ -1,31 +1,31 @@
 {
   "layout": {
     "input_dir": "input",
-    "working_dir": "working",
     "results_dir": "results",
-    "table_prefix": "Contrast table"
+    "table_prefix": "Two-group comparisons"
   },
   "datasets": {
     "DatasetA": {
-      "group_column": ["Condition"],
+      "group_column": [
+        "Condition"
+      ],
       "trial_column": "Trial",
       "subject_column": "Subject",
       "comparison_by": "Condition",
-      "paired": true,
-      "categorical_mappings": {
-        "Condition": {"Baseline": 0, "Follow-up": 1}
-      }
+      "paired": true
     },
     "DatasetB": {
-      "group_column": ["Condition"],
+      "group_column": [
+        "Condition"
+      ],
       "trial_column": "",
       "subject_column": "Subject",
       "comparison_by": "Condition",
       "paired": true,
-      "levels": ["Baseline", "Follow-up"],
-      "categorical_mappings": {
-        "Condition": {"Baseline": 0, "Follow-up": 1}
-      }
+      "levels": [
+        "Baseline",
+        "Follow-up"
+      ]
     }
   }
 }

@@ -9,7 +9,7 @@ authors:
   - family-names: "Espitia Arias"
     given-names: "Michael D."
     email: esspitia@gmail.com
-repository-code: "https://github.com/TODO/amacrine-motion-detection"  # TODO: real URL once (re-)pushed
+repository-code: "https://github.com/michaeldespitiaarias/amacrine-motion-detection"
 license: PolyForm-Noncommercial-1.0.0
 version: "0.0.0"  # TODO: set to the tagged release version (e.g. v1.0.0) at Zenodo archival time
 date-released: "TODO"  # TODO: set at release time, ISO 8601 (YYYY-MM-DD)

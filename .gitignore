@@ -21,8 +21,19 @@ data/
 # tree for local analysis — never part of this repo's history, public or
 # not. Ignored by exact name (not a generic pattern) so a future, similarly
 # named folder doesn't silently start being tracked instead of ignored.
-/RE_ Manuscrito para ajustes finales/
+# (formerly "RE_ Manuscrito para ajustes finales/", renamed to "publication/"
+# when the manuscript/data/figures/bibliography tree was organized.)
+/publication/
 *.docx
+
+# The pre-refactor notebook collection that used to live at /Figures-codes/
+# (figure/stats code pre-dating the expda package split, with executed cell
+# outputs carrying real data and hardcoded local/institutional paths) has
+# been deleted outright rather than merely ignored -- superseded by
+# publication/figures/code/plot_manuscript_figures.py, which regenerates
+# every data-panel figure straight from this repo's own pipeline output.
+# Kept as a blanket rule in case a notebook is ever dropped in again.
+*.ipynb
 
 # Editor / OS
 .DS_Store

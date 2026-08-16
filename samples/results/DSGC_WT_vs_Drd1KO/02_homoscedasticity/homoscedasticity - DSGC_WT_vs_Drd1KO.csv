@@ -1,3 +1,0 @@
-Variable,N total,N used,Test Used,Statistic,p-value,Significance
-DSI,28,28,Bartlett,0.4407113685968658,0.5067793077500342,ns
-Firing_rate_Hz,28,28,Bartlett,0.7923048603409246,0.3734040950632953,ns

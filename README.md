@@ -4,7 +4,12 @@ Analysis code accompanying **"Dopaminergic amacrine cells modulate retinal
 movement detection."** It cleans and screens a dataset, reports the
 assumptions behind the tests that follow, and runs two-group contrasts with
 effect sizes, confidence intervals, and Benjamini-Hochberg FDR correction
-across the variables tested.
+across the variables tested. Variables that are levels of one within-subject
+factor (e.g. contrast sensitivity at six spatial frequencies) are instead
+routed to a 2-way repeated-measures ANOVA, so the correlation between
+adjacent levels is used rather than discarded, and per-level comparisons only
+run once there's evidence the effect actually depends on the level — see
+Repeated-measures level families below.
 
 Every output is a plain CSV — raw numbers, no styling, no narrative
 document, no figures. This is a statistical-analysis repository, not a
@@ -23,8 +28,9 @@ src/expda/
     config.py                 paths and the dataset registry
     preprocessing.py          stage 1: cleaning, aggregation, screening
     effect_sizes.py           effect-size estimators and their intervals
-    multicomparison.py        Benjamini-Hochberg FDR correction
+    multicomparison.py        Benjamini-Hochberg FDR + Holm-Bonferroni
     inference.py              stage 2: two-group contrasts
+    rm_anova.py               stage 2b: repeated-measures level families
     reporting.py              plain-CSV writer shared by every stage
 scripts/
     01_preprocess.py          run stage 1 over every dataset
@@ -57,9 +63,8 @@ export EXPDA_REGISTRY=/path/to/registry.json   # optional
 {
   "layout": {
     "input_dir": "input",
-    "working_dir": "working",
     "results_dir": "results",
-    "table_prefix": "Contrast table"
+    "table_prefix": "Two-group comparisons"
   },
   "datasets": {
     "DatasetA": {
@@ -68,8 +73,11 @@ export EXPDA_REGISTRY=/path/to/registry.json   # optional
       "subject_column": "Subject",
       "comparison_by": "Condition",
       "paired": true,
-      "categorical_mappings": {
-        "Condition": {"Baseline": 0, "Follow-up": 1}
+      "repeated_families": {
+        "Contrast sensitivity": {
+          "column_prefix": "Optomotor",
+          "label_strip": ["Optomotor (", ")"]
+        }
       }
     }
   }
@@ -84,24 +92,28 @@ export EXPDA_REGISTRY=/path/to/registry.json   # optional
 | `comparison_by` | the factor whose two levels are contrasted |
 | `paired` | whether the contrast uses a paired test |
 | `levels` | optional pair selecting which two levels to contrast and their order |
-| `categorical_mappings` | label encoding used by the correlation report |
 | `transform` | optional variable transformation, default `none` |
 | `mv_drop_pct` | missing-value skip gate, default `30` (%) — see Pipeline below |
 | `outlier_pct_skip` | outlier replacement-skip gate, default `15` (%) |
 | `outlier_replace_max_n` | absolute cap on points replaced per (group, column), default `2` |
 | `outlier_replace_max_n_group_ceiling` | group size above which the cap stops applying, default `20` |
+| `repeated_families` | named groups of columns that are levels of one within-subject factor — see below |
 
 Expected tree under the data root:
 
 ```
 <EXPDA_DATA>/
-    <input_dir>/    <Dataset>.csv                input to stage 1
-    <working_dir>/  <Dataset>_no_outliers.csv    input to stage 2
-    <results_dir>/<Dataset>/<report subfolders>
+    <input_dir>/    <Dataset>.csv                          input to stage 1
+    <results_dir>/<Dataset>/(1) Preprocessed/<Dataset>_no_outliers.csv
+                                                 stage 1's output, stage 2's input
+    <results_dir>/<Dataset>/(2) Statistical inference/…csv
 ```
 
 The dataset name is the join key across every stage: the same string names the
-input CSV, the working CSV, the results folder and the table inside it.
+input CSV, the results folder and the table inside it. There is no separate
+top-level "working" mirror of the preprocessed CSV — stage 2 reads it
+straight from `(1) Preprocessed/`, so there is only one copy to ever go
+stale.
 
 ## Usage
 
@@ -130,11 +142,19 @@ python scripts/02_two_group_contrasts.py --output /tmp/tables --no-intervals
     │                                groups only) — see Safety gates below
     ↓  transform_variables          scale-standardizing methods only
                                      (zscore/minmax)
-<working_dir>/<Dataset>_no_outliers.csv
-    ↓  normality · homoscedasticity · correlation · multicollinearity reports
-    ↓  compare_two_groups
-<results_dir>/<Dataset>/<contrasts>/…csv
+<results_dir>/<Dataset>/(1) Preprocessed/<Dataset>_no_outliers.csv
+    ↓  compare_two_groups         variables outside any repeated_families group
+    ↓  rm_anova.run_repeated_families   one 2-way RM-ANOVA per declared family
+<results_dir>/<Dataset>/(2) Statistical inference/…csv
 ```
+
+Normality and homoscedasticity are not written as separate reports —
+`compare_two_groups` and `rm_anova.py` each recompute the assumption checks
+that gate their own test/engine choice and write them as columns in the
+same table, right before the test they gated (see Test selection below).
+There is nothing to cross-reference against a separate file: a starred
+assumption column means that assumption was rejected, not that a real
+effect was found.
 
 `average_trials` makes the subject, rather than the trial, the unit of analysis.
 Designs measured at more than two levels declare a `levels` pair in the registry
@@ -169,6 +189,50 @@ research samples (typically 3–15 subjects per group):
   Those cells get a non-destructive `{column}_outlier` diagnostic column
   instead of being overwritten.
 
+## Repeated-measures level families
+
+A variable is a **level of one within-subject factor**, not an independent
+measurement, when it is the same construct sampled several times in one test
+session for the same subject — contrast sensitivity at six spatial
+frequencies, ERG amplitude at nine light intensities. Testing each level
+separately with `compare_two_groups` and correcting with BH-FDR treats them
+as an unordered bag of variables: it throws away the correlation between
+adjacent levels, and it still tests every level whether or not the deficit
+actually depends on the level at all.
+
+A dataset's `repeated_families` config (a `column_prefix` or explicit
+`columns` list per named family) routes those columns to `rm_anova.py`
+instead: a single 2-way repeated-measures ANOVA per family (Condition x
+Level, both within-subject). Columns claimed by a family are excluded from
+the plain per-variable path, so a level is never tested by both engines at
+once.
+
+**Engine, chosen once per family (never per term):**
+
+```
+all (Condition, Level) cells pass Shapiro-Wilk (alpha=0.05) and n >= 5,
+and Levene across cells (center='median') passes
+    -> parametric pingouin.rm_anova, Greenhouse-Geisser corrected
+otherwise
+    -> Aligned Rank Transform (ART, Wobbrock 2011), adapted for the
+       within-subject case (see rm_anova.py's module docstring for the
+       closed-form decomposition)
+```
+
+**Post-hoc is gated**: per-level pairwise comparisons (paired t-test or
+Wilcoxon, by per-level normality, Holm-Bonferroni-corrected across levels)
+run *if and only if* the Condition x Level interaction is itself significant
+— evidence the effect's shape differs by level, before any level is tested
+individually. A significant Condition main effect with a non-significant
+interaction is reported as a uniform, level-independent shift and is not
+decomposed further, which is exactly the unguarded multiple-comparison
+problem this module exists to avoid.
+
+Output: `Repeated-measures omnibus - {family}.csv` (always) and
+`Repeated-measures posthoc - {family}.csv` (only when the interaction gate opens),
+alongside the dataset's plain `Two-group comparisons - {dataset}.csv` for whatever
+variables aren't part of a family.
+
 ## Test selection
 
 Chosen from the data rather than fixed in advance:
@@ -189,11 +253,17 @@ alongside — never in place of — the raw `p_value`.
 
 ## Output
 
-One CSV table per dataset, carrying per variable: the test, its p-value and
-significance class, the effect size, n, mean, SD and median per group, the
-direction of the effect, the pretest p-values, Hedges' g, a bootstrap 95 %
-confidence interval, a signed rank-biserial, and the BH-FDR-adjusted q-value
-with its own significance flag.
+One CSV table per dataset, carrying per variable: n, mean and SD per group,
+the direction of the effect, the assumption checks that gated the test
+choice (normality test name + p-value + significance per group,
+homoscedasticity test name + p-value + significance — positioned *before*
+the test they gated, so the reason a test was chosen reads before the
+result it produced), then the test itself: its name, p-value, significance
+class, effect size, Hedges' g, a bootstrap 95 % confidence interval, a
+signed rank-biserial, and the BH-FDR-adjusted q-value with its own
+significance stars. Variables belonging to a `repeated_families`
+group instead land in that family's `Repeated-measures omnibus` / `Repeated-measures posthoc`
+CSVs — see Repeated-measures level families above.
 
 The bootstrap uses a fixed seed (`effect_sizes.BOOTSTRAP_SEED`), so the
 intervals are reproducible across runs and machines.

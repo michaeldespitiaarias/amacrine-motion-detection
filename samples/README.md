@@ -9,8 +9,8 @@ experimental dataset behind the paper.
   independent-groups genotype comparison), plus planted missing values and
   outliers to exercise the preprocessing safety gates.
 - `registry.json` — the dataset registry describing both.
-- `working/`, `results/` — real output of running the pipeline against
-  `input/` (not hand-edited).
+- `results/` — real output of running the pipeline against `input/` (not
+  hand-edited).
 
 ## Reproduce
 

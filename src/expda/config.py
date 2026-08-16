@@ -12,12 +12,14 @@ See ``registry.example.json`` for the expected shape.
 Expected tree under the data root::
 
     <DATA_ROOT>/
-        <input_dir>/         <Dataset>.csv               input to stage 1
-        <working_dir>/       <Dataset>_no_outliers.csv   input to stage 2
-        <results_dir>/<Dataset>/<report subfolders>
+        <input_dir>/    <Dataset>.csv   input to stage 1
+        <results_dir>/<Dataset>/<report_folders["intermediate"]>/<Dataset>_no_outliers.csv
+            -- stage 1's output, and stage 2's input, in one place (no
+               separate top-level "working" mirror to keep in sync)
+        <results_dir>/<Dataset>/<report_folders["hypothesis_contrast"]>/...
 
 The dataset name is the join key across every stage: the same string names the
-input CSV, the working CSV, the results folder and the table inside it.
+input CSV, the results folder and the table inside it.
 """
 
 from __future__ import annotations
@@ -33,17 +35,12 @@ DATA_ROOT = Path(os.environ.get("EXPDA_DATA", PACKAGE_ROOT / "data")).expanduser
 # Directory names, overridable through the registry file.
 DEFAULT_LAYOUT = {
     "input_dir": "input",
-    "working_dir": "working",
     "results_dir": "results",
     "report_folders": {
-        "intermediate": "00_working",
-        "normality": "01_normality",
-        "homoscedasticity": "02_homoscedasticity",
-        "correlation": "03_correlation",
-        "multicollinearity": "04_multicollinearity",
-        "hypothesis_contrast": "05_contrasts",
+        "intermediate": "(1) Preprocessed",
+        "hypothesis_contrast": "(2) Statistical inference",
     },
-    "table_prefix": "Contrast table",
+    "table_prefix": "Two-group comparisons",
 }
 
 
@@ -88,14 +85,22 @@ def input_path(name: str, layout: dict) -> Path:
     return DATA_ROOT / layout["input_dir"] / f"{name}.csv"
 
 
-def working_path(name: str, layout: dict) -> Path:
-    """Path to the preprocessed CSV that stage 2 consumes."""
-    return DATA_ROOT / layout["working_dir"] / f"{name}_no_outliers.csv"
-
-
 def results_path(name: str, folder_key: str, layout: dict) -> Path:
     """Path to one report subfolder of one dataset."""
     return DATA_ROOT / layout["results_dir"] / name / layout["report_folders"][folder_key]
+
+
+def preprocessed_csv_path(name: str, layout: dict) -> Path:
+    """Path to the preprocessed CSV: stage 1's output and stage 2's input.
+
+    A single location for both ends of the handoff — this used to be two
+    separate copies (a per-dataset one under ``results_path(..., "intermediate", ...)``
+    for human browsing, and a second one under a flat top-level ``working/``
+    directory that stage 2 actually read from). They used to be able to
+    diverge if only one was regenerated, which silently broke the pipeline;
+    now there is only the one file to keep current.
+    """
+    return results_path(name, "intermediate", layout) / f"{name}_no_outliers.csv"
 
 
 def select(registry: dict, names: list[str] | None) -> dict:

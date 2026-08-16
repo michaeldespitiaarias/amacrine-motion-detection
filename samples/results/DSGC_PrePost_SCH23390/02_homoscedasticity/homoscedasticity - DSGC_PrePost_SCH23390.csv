@@ -1,4 +1,0 @@
-Variable,N total,N used,Test Used,Statistic,p-value,Significance
-DSI,32,32,Bartlett,0.5326108713334526,0.4655112586063842,ns
-Firing_rate_Hz,32,32,Bartlett,3.3871501717843304,0.06570642423934839,ns
-Response_latency_ms,32,32,Bartlett,1.5733582057873992,0.20971999030886776,ns
